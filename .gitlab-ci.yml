@@ -1,4 +1,4 @@
-.deploy: &deploy
+.deploy:
   before_script:
     - cat /etc/os-release
     - uname -a
@@ -7,7 +7,10 @@
     - gem install bundler
     - bundle --version
     - apk add --no-cache --update build-base git
-    - bundle install --clean --deployment --jobs=2 --without default development lint production test performance
+    - bundle config set --local clean 'true'
+    - bundle config set --local deployment 'true'
+    - bundle config set --local without 'default development lint production test performance'
+    - bundle install --jobs=2
   image: ruby:alpine
   only:
     - master
@@ -15,7 +18,7 @@
   tags:
     - gitlab-org
 
-.lint: &lint
+.lint:
   before_script:
     - cat /etc/os-release
     - uname -a
@@ -24,106 +27,125 @@
     - gem install bundler
     - bundle --version
     - apk add --no-cache --update build-base git
-    - bundle install --clean --deployment --jobs=2 --without default deployment development production test performance
-  image: ruby:alpine
+    - bundle config set --local clean 'true'
+    - bundle config set --local deployment 'true'
+    - bundle config set --local without 'default deployment development production test performance'
+    - bundle install --jobs=2
+  image: ruby:2.6-alpine
   stage: lint
   tags:
     - gitlab-org
 
-.test: &test
+.test_before_script: &test_before_script
+  - cat /etc/os-release
+  - uname -a
+  - ruby --version
+  - gem --version
+  - gem install bundler
+  - bundle --version
+  - bundle config set --local clean 'true'
+  - bundle config set --local deployment 'true'
+  - bundle config set --local without 'deployment development lint production performance'
+
+.test_alpine_before_script: &test_alpine_before_script
+  - apk add --no-cache --update build-base curl git sqlite-dev tzdata
+
+.test_debian_before_script: &test_debian_before_script
+  - apt-get update
+  - apt-get install -y build-essential curl git libsqlite3-dev tzdata
+
+.test:
   artifacts:
     expire_in: 1 day
     paths:
       - coverage
-  after_script:
-    - ./cc-test-reporter after-build -t simplecov
   before_script:
-    - cat /etc/os-release
-    - uname -a
-    - ruby --version
-    - gem --version
-    - gem install bundler
-    - bundle --version
-    - apk add --no-cache --update build-base curl git sqlite-dev tzdata
-    - bundle install --clean --deployment --jobs=2 --without deployment development lint production performance
-    - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
-    - chmod +x ./cc-test-reporter
-    - ./cc-test-reporter before-build
+    - *test_before_script
+    - *test_alpine_before_script
   script:
+    - bundle install --jobs=2
     - bundle exec rake
   stage: test
   tags:
     - gitlab-org
 
-.use_jruby_9_2: &use_jruby_9_2
-  image: jruby:9.2-alpine
+.use_jruby_9_2:
+  image: bitnami/jruby:9.2
+  before_script:
+    - *test_before_script
+    - *test_debian_before_script
 
-.use_mri_2_3: &use_mri_2_3
+.use_mri_2_3:
   image: ruby:2.3-alpine
 
-.use_mri_2_4: &use_mri_2_4
+.use_mri_2_4:
   image: ruby:2.4-alpine
 
-.use_mri_2_5: &use_mri_2_5
+.use_mri_2_5:
   image: ruby:2.5-alpine
 
-.use_rails_4_2: &use_rails_4_2
-  <<: *test
+.use_rails_4_2:
+  extends: .test
   variables:
     BUNDLE_GEMFILE: gemfiles/Gemfile.rails-4.2.x
 
-.use_rails_5_0: &use_rails_5_0
-  <<: *test
+.use_rails_5_0:
+  extends: .test
   variables:
     BUNDLE_GEMFILE: gemfiles/Gemfile.rails-5.0.x
 
-.use_rails_5_1: &use_rails_5_1
-  <<: *test
+.use_rails_5_1:
+  extends: .test
   variables:
     BUNDLE_GEMFILE: gemfiles/Gemfile.rails-5.1.x
 
-.use_rails_5_2: &use_rails_5_2
-  <<: *test
+.use_rails_5_2:
+  extends: .test
   variables:
     BUNDLE_GEMFILE: Gemfile
 
-.use_rails_6_0: &use_rails_6_0
-  <<: *test
+.use_rails_6_0:
+  extends: .test
   variables:
     BUNDLE_GEMFILE: gemfiles/Gemfile.rails-6.0.x
+
+.use_rails_6_1:
+  extends: .test
+  variables:
+    BUNDLE_GEMFILE: gemfiles/Gemfile.rails-6.1.x
 
 cache:
   paths:
     - vendor/bundle
 
 lint:brakeman:
-  <<: *lint
+  extends: .lint
   artifacts:
     expire_in: 1 day
     paths:
       - brakeman
     when: always
   script:
-    - bin/brakeman --exit-on-warn --output brakeman/index.html
+    - bundle exec brakeman --exit-on-warn --output brakeman/index.html
 
 lint:bundler:audit:
-  <<: *lint
+  extends: .lint
   script:
-    - bin/bundle-audit check --update --verbose
+    - bundle exec bundle-audit check --update --verbose
 
 lint:i18n:
-  <<: *lint
+  extends: .lint
   allow_failure: true
   script:
-    - bin/i18n-tasks health
+    - bundle exec i18n-tasks health
 
 lint:rubocop:
-  <<: *lint
+  extends: .lint
   script:
-    - bin/rubocop
+    - bundle exec rubocop
 
 pages:
-  <<: *deploy
+  extends: .deploy
   artifacts:
     expire_in: 1 month
     paths:
@@ -142,68 +164,94 @@ stages:
   - deploy
 
 test:rails-4.2:jruby:9.2:
-  <<: *use_jruby_9_2
-  <<: *use_rails_4_2
+  extends:
+    - .use_rails_4_2
+    - .use_jruby_9_2
 
 test:rails-4.2:mri:2.3:
-  <<: *use_mri_2_3
-  <<: *use_rails_4_2
+  extends:
+    - .use_mri_2_3
+    - .use_rails_4_2
 
 test:rails-4.2:mri:2.4:
-  <<: *use_mri_2_4
-  <<: *use_rails_4_2
+  extends:
+    - .use_mri_2_4
+    - .use_rails_4_2
 
 test:rails-4.2:mri:2.5:
-  <<: *use_mri_2_5
-  <<: *use_rails_4_2
+  extends:
+    - .use_mri_2_5
+    - .use_rails_4_2
 
 test:rails-5.0:jruby:9.2:
-  <<: *use_jruby_9_2
-  <<: *use_rails_5_0
+  extends:
+    - .use_rails_5_0
+    - .use_jruby_9_2
 
 test:rails-5.0:mri:2.3:
-  <<: *use_mri_2_3
-  <<: *use_rails_5_0
+  extends:
+    - .use_mri_2_3
+    - .use_rails_5_0
 
 test:rails-5.0:mri:2.4:
-  <<: *use_mri_2_4
-  <<: *use_rails_5_0
+  extends:
+    - .use_mri_2_4
+    - .use_rails_5_0
 
 test:rails-5.0:mri:2.5:
-  <<: *use_mri_2_5
-  <<: *use_rails_5_0
+  extends:
+    - .use_mri_2_5
+    - .use_rails_5_0
 
 test:rails-5.1:jruby:9.2:
-  <<: *use_jruby_9_2
-  <<: *use_rails_5_1
+  extends:
+    - .use_rails_5_1
+    - .use_jruby_9_2
 
 test:rails-5.1:mri:2.3:
-  <<: *use_mri_2_3
-  <<: *use_rails_5_1
+  extends:
+    - .use_mri_2_3
+    - .use_rails_5_1
 
 test:rails-5.1:mri:2.4:
-  <<: *use_mri_2_4
-  <<: *use_rails_5_1
+  extends:
+    - .use_mri_2_4
+    - .use_rails_5_1
 
 test:rails-5.1:mri:2.5:
-  <<: *use_mri_2_5
-  <<: *use_rails_5_1
+  extends:
+    - .use_mri_2_5
+    - .use_rails_5_1
 
 test:rails-5.2:jruby:9.2:
-  <<: *use_jruby_9_2
-  <<: *use_rails_5_2
-
-test:rails-5.2:mri:2.4:
-  <<: *use_mri_2_4
-  <<: *use_rails_5_2
+  extends:
+    - .use_rails_5_2
+    - .use_jruby_9_2
 
 test:rails-5.2:mri:2.5:
-  <<: *use_mri_2_5
-  <<: *use_rails_5_2
+  extends:
+    - .use_mri_2_5
+    - .use_rails_5_2
+  variables:
+    COVERAGE: 'true'
+  before_script:
+    - *test_before_script
+    - *test_alpine_before_script
+    - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+    - chmod +x ./cc-test-reporter
+    - ./cc-test-reporter before-build
+  after_script:
+    - ./cc-test-reporter after-build -t simplecov
 
 test:rails-6.0:mri:2.5:
-  <<: *use_mri_2_5
-  <<: *use_rails_6_0
+  extends:
+    - .use_mri_2_5
+    - .use_rails_6_0
+
+test:rails-6.1:mri:2.5:
+  extends:
+    - .use_mri_2_5
+    - .use_rails_6_1
   allow_failure: true
 
 variables:

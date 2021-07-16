@@ -41,7 +41,7 @@ module ActiveScaffold
           restore_view_paths = lookup_context.view_paths
           lookup_context.view_paths = @_view_paths
         end
-        lookup_context.exists?(template_name, '', partial).tap do
+        (@_lookup_context || lookup_context).exists?(template_name, '', partial).tap do
           lookup_context.view_paths = restore_view_paths if @_view_paths
         end
       end

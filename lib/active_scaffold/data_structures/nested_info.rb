@@ -66,6 +66,10 @@ module ActiveScaffold::DataStructures
     def sorted?(*)
       false
     end
+
+    def match_model?(model)
+      false
+    end
   end
 
   class NestedInfoAssociation < NestedInfo
@@ -100,6 +104,14 @@ module ActiveScaffold::DataStructures
       association.through?
     end
 
+    def match_model?(model)
+      if association.polymorphic?
+        child_association&.inverse_klass == model
+      else
+        association.klass == model
+      end
+    end
+
     def sorted?(chain)
       default_sorting(chain).present?
     end
@@ -119,8 +131,8 @@ module ActiveScaffold::DataStructures
     protected
 
     def setup_constrained_fields
-      @constrained_fields = Array(association.foreign_key).map(&:to_sym) unless association.belongs_to?
-      @constrained_fields ||= []
+      @constrained_fields = [] if association.belongs_to? || association.through?
+      @constrained_fields ||= Array(association.foreign_key).map(&:to_sym)
       return unless child_association && child_association != association
 
       @constrained_fields << child_association.name

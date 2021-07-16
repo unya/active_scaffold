@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
                   'ActiveScaffold handles all your CRUD (create, read, update, delete) user interface needs, '\
                   'leaving you more time to focus on more challenging (and interesting!) problems.'
   s.require_paths = ['lib']
-  s.files = `git ls-files {app,config,lib,public,shoulda_macros,vendor}`.split("\n") + %w[LICENSE.md CHANGELOG README.md]
+  s.files = `git ls-files {app,config,lib,public,shoulda_macros,vendor}`.split("\n") + %w[LICENSE.md CHANGELOG.rdoc README.md]
   s.extra_rdoc_files = [
     'README.md'
   ]
@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
 
   # Ruby on Rails is a full-stack web framework optimized for programmer happiness and sustainable productivity.
   # It encourages beautiful code by favoring convention over configuration.
-  s.add_runtime_dependency('rails', '>= 4.2.0')
+  s.add_runtime_dependency('rails', '>= 4.2.0', '< 6.2')
   # Deep Freeze Ruby Objects
   s.add_runtime_dependency('cow_proxy', '~> 0.3')
   s.add_runtime_dependency('ice_nine', '~> 0.11')

@@ -72,7 +72,8 @@ module ActiveScaffold::Actions
         else
           updated_record_with_column(@column, params.delete(:value), @scope)
         end
-      setup_parent(@record) if main_form_controller && @scope
+      # if @scope has more than 2 ] then it's subform inside subform, and assign parent would fail (found associotion may be through association)
+      setup_parent(@record) if main_form_controller && @scope && @scope.scan(']').size == 2
       after_render_field(@record, @column)
     end
 
@@ -276,12 +277,10 @@ module ActiveScaffold::Actions
     end
 
     def new_model
-      # ignore nested unrelated to current controller, e.g. adding record in subform inside subform, would create wrong parent_record
-      if nested? && nested.association && nested.association.klass != active_scaffold_config.model
-        return active_scaffold_config.model.new
-      end
       relation = beginning_of_chain
-      build_options = sti_nested_build_options(relation.klass) if nested? && nested.plural_association?
+      if nested? && nested.plural_association? && nested.match_model?(active_scaffold_config.model)
+        build_options = sti_nested_build_options(relation.klass)
+      end
       relation.respond_to?(:build) ? relation.build(build_options || {}) : relation.new
     end
 

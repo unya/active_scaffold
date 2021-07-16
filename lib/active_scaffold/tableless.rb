@@ -34,11 +34,17 @@ class ActiveScaffold::Tableless < ActiveRecord::Base # rubocop:disable Rails/App
     def columns(table_name)
       klass.columns
     end
+
+    if Rails.version >= '6.0.0'
+      def data_sources
+        klass ? [klass.table_name] : []
+      end
+    end
   end
 
   class Column < ActiveRecord::ConnectionAdapters::Column
     if Rails.version >= '5.0.0'
-      def initialize(name, default, sql_type = nil, null = true)
+      def initialize(name, default, sql_type = nil, null = true, **)
         metadata = ActiveRecord::Base.connection.send :fetch_type_metadata, sql_type
         super(name, default, metadata, null)
       end
@@ -149,9 +155,17 @@ class ActiveScaffold::Tableless < ActiveRecord::Base # rubocop:disable Rails/App
     def execute_simple_calculation(operation, column_name, distinct)
       @klass.execute_simple_calculation(self, operation, column_name, distinct)
     end
+
+    def implicit_order_column
+      @klass.implicit_order_column
+    end
+
+    def exists?
+      limit(1).to_a.present?
+    end
   end
 
-  class Relation < ActiveRecord::Relation
+  class Relation < ::ActiveRecord::Relation
     include RelationExtension
   end
   class << self

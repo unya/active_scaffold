@@ -68,7 +68,7 @@ module ActiveScaffold::DataStructures
     end
 
     def each_column(options = {}, &proc)
-      columns = action.core.columns
+      columns = options[:core_columns] || action.core.columns
       self.unauthorized_columns = []
       options[:for] ||= columns.active_record_class
 
@@ -124,7 +124,7 @@ module ActiveScaffold::DataStructures
     end
 
     def action_name
-      @action.class.name.demodulize.underscore
+      @action.user_settings_key
     end
 
     def columns_key
